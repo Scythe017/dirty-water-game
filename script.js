@@ -118,13 +118,8 @@ function walkScene() {
     () => {
       addChoice("Go to friend's house", friendsHouse);
       addChoice("Walk to the park", parkScene);
-      addChoice("WAIT", waitScene);
     }
   );
-}
-
-function waitScene() {
-  typeText("You wait. Time passes. Nothing happens.", walkScene);
 }
 
 function parkScene() {
