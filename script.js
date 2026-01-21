@@ -124,18 +124,54 @@ function walkScene() {
 }
 
 function waitScene() {
-  typeText("You wait. The world continues.", walkScene);
+  typeText("You wait. Time passes. Nothing happens.", walkScene);
 }
 
 function parkScene() {
-  typeText("The park exists. Progress is real.", walkScene);
+  typeText(
+    "You reach the park. You get bored quickly and decide to go to your friend's house.",
+    friendsHouse
+  );
 }
 
 function friendsHouse() {
   typeText(
-    "Your friend is gone. A note asks you to get eggs from the store.",
+    "Your friend is not home. A note reads: 'Hey, I won’t be home. Can you go to the store and get some eggs?'",
     () => addChoice("Go to the store", storeEntrance)
   );
+}
+
+// =======================
+// STORE
+// =======================
+function storeEntrance() {
+  typeText(
+    "You enter the store. The shelves are quiet... but you feel something is off.",
+    () => startFight("Creature")
+  );
+}
+
+function backrooms() {
+  updateStats();
+  clearChoices();
+  typeText("You step into the back rooms of the store. The game begins.", () => {
+    addChoice("Search drawers", findItem);
+    addChoice("Go deeper", randomEncounter);
+    if (player.level >= 5) addChoice("Boss Door", bossEncounter);
+  });
+}
+
+function findItem() {
+  const pool = ["Beer", "Meat", "Slingshot"];
+  const found = pool[Math.floor(Math.random() * pool.length)];
+  player.inventory.push(found);
+  saveGame();
+  typeText(`You found ${found}.`, backrooms);
+}
+
+function randomEncounter() {
+  const list = Object.keys(enemies);
+  startFight(list[Math.floor(Math.random() * list.length)]);
 }
 
 // =======================
@@ -151,7 +187,7 @@ function fightMenu() {
   updateStats();
   clearChoices();
   typeText(
-    `${enemy.name} appears.\nEnemy HP: ${enemy.hp}`,
+    `${enemy.name} appears!\nEnemy HP: ${enemy.hp}`,
     () => {
       addChoice("ATTACK", attackMenu);
       addChoice("USE ITEM", inventoryMenu);
@@ -162,29 +198,29 @@ function fightMenu() {
 
 function attackMenu() {
   clearChoices();
-  typeText("Choose attack:", () => {
-    addChoice("Fists (10)", () => damageEnemy(10));
-    addChoice("Throw Rock (15)", () => damageEnemy(15));
+  typeText("Choose your attack:", () => {
+    addChoice("Fists (10 dmg)", () => playerAttack(10));
+    addChoice("Throw Rock (15 dmg)", () => playerAttack(15));
   });
 }
 
-function damageEnemy(dmg) {
+function playerAttack(dmg) {
   enemy.hp -= dmg;
-  if (enemy.hp <= 0) winFight();
-  else enemyTurn();
+  if (enemy.hp <= 0) return winFight();
+  enemyTurn();
 }
 
 function enemyTurn() {
   player.hp -= enemy.dmg;
-  if (player.hp <= 0) gameOver();
-  else fightMenu();
+  if (player.hp <= 0) return gameOver();
+  fightMenu();
 }
 
 function flee() {
-  if (Math.random() < 0.25 && !enemy.boss) {
-    typeText("You escape.", backrooms);
+  if (!enemy.boss && Math.random() < 0.25) {
+    typeText("You flee successfully.", backrooms);
   } else {
-    enemyTurn();
+    typeText("Failed to flee!", () => enemyTurn());
   }
 }
 
@@ -207,7 +243,7 @@ function inventoryMenu() {
 }
 
 // =======================
-// PROGRESSION
+// WIN / LEVEL UP
 // =======================
 function winFight() {
   clearChoices();
@@ -216,10 +252,14 @@ function winFight() {
     if (!player.permanent.includes(reward)) {
       player.permanent.push(reward);
       player.inventory.push(reward);
+      typeText(`Boss defeated! You got a permanent item: ${reward}`, backrooms);
     } else {
       player.inventory.push("Metal Ball");
+      typeText(`Boss defeated! You got a Metal Ball instead.`, backrooms);
     }
     player.flags.bossesDefeated[enemy.name] = true;
+  } else {
+    typeText(`${enemy.name} defeated!`, backrooms);
   }
   player.level++;
   saveGame();
@@ -227,6 +267,7 @@ function winFight() {
 }
 
 function levelUp() {
+  clearChoices();
   typeText(
     `Level up! You are now level ${player.level}.`,
     () => {
@@ -235,7 +276,7 @@ function levelUp() {
         player.hp = player.maxHp;
         backrooms();
       });
-      addChoice("Get random item", () => {
+      addChoice("Get a random item", () => {
         const pool = ["Beer", "Meat", "Slingshot"];
         player.inventory.push(pool[Math.floor(Math.random() * pool.length)]);
         backrooms();
@@ -245,41 +286,10 @@ function levelUp() {
 }
 
 // =======================
-// STORE / BACKROOMS
+// BOSS
 // =======================
-function storeEntrance() {
-  typeText("The store is wrong. Creatures move.", () => {
-    startFight("Creature");
-    player.flags.firstFightDone = true;
-  });
-}
-
-function backrooms() {
-  updateStats();
-  clearChoices();
-  typeText("Back rooms of the store. Endless.", () => {
-    addChoice("Search drawers", findItem);
-    addChoice("Go deeper", randomEncounter);
-    if (player.level >= 5) addChoice("Boss Door", bossEncounter);
-  });
-}
-
-function findItem() {
-  const pool = ["Beer", "Meat", "Slingshot"];
-  const found = pool[Math.floor(Math.random() * pool.length)];
-  player.inventory.push(found);
-  saveGame();
-  typeText(`You found ${found}.`, backrooms);
-}
-
-function randomEncounter() {
-  const list = Object.keys(enemies);
-  startFight(list[Math.floor(Math.random() * list.length)]);
-}
-
 function bossEncounter() {
-  const available = Object.keys(bosses)
-    .filter(b => !player.flags.bossesDefeated[b]);
+  const available = Object.keys(bosses).filter(b => !player.flags.bossesDefeated[b]);
   if (available.length === 0) {
     typeText("No bosses remain.", backrooms);
     return;
@@ -288,18 +298,18 @@ function bossEncounter() {
 }
 
 // =======================
-// END
+// GAME OVER
 // =======================
 function gameOver() {
   localStorage.removeItem("dirtyWaterSave");
   clearChoices();
-  typeText("You collapse. Dirty water fills the screen.", () => {
+  typeText("You collapse. Game Over.", () => {
     addChoice("Restart", () => location.reload());
   });
 }
 
 // =======================
-// START
+// START GAME
 // =======================
 loadGame();
 walkScene();
